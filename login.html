@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Werbs</title>
+<link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="./image/ChatGPT Image 25 июн. 2026 г., 22_43_20.png"">
+</head>
+<body class="auth-page">
+<div class="reg">
+    <div class="header-box">
+        <h1 data-i18n="loginHeaderTitle">Войти в Werbs</h1>
+        <p data-i18n="loginHeaderDesc">Введите свой ник и пароль</p>
+    </div>
+    <div class="form-box">
+        <form id="loginForm">
+            <label for="nickname" data-i18n="labelNickname">Ник</label>
+            <input type="text" id="nickname" data-i18n-ph="placeholderNickname" placeholder="ваш ник" autocomplete="off">
+
+            <label for="password" data-i18n="labelPassword">Пароль</label>
+            <input type="password" id="password" data-i18n-ph="placeholderPassword" placeholder="ваш пароль">
+
+            <div class="error" id="error"></div>
+            <button type="submit" data-i18n="loginSubmit">Войти</button>
+        </form>
+        <div class="bottom-link">
+            <span data-i18n="noAccount">Нет аккаунта?</span>
+            <a href="register.html" data-i18n="registerLink">Зарегистрироваться</a>
+        </div>
+    </div>
+</div>
+<div id="pageLoader" class="page-loader hidden"><div class="loader-spinner"></div></div>
+<script src="work.js" type="module"></script>
+</body>
+</html>

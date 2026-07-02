@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Werbs</title>
+    <link rel="stylesheet" href="style.css">
+        <link rel="icon" type="image/png" href="./image/2.png"">
+</head>
+<body class="app-page">
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-top">
+            <button class="sidebar-icon active" id="btn-chats" data-i18n-title="ttChats" title="Чаты" onclick="switchTab('chats')">💬</button>
+            <button class="sidebar-icon" id="btn-friends" data-i18n-title="ttFriends" title="Друзья" onclick="switchTab('friends')">👥</button>
+            <button class="sidebar-icon" id="btn-add" data-i18n-title="ttAddFriend" title="Добавить друга" onclick="openAddFriend()">👤+</button>
+            <button class="sidebar-icon" id="btn-shop" data-i18n-title="ttShop" title="Магазин" onclick="openShop()">🛍️</button>
+        </div>
+        <div class="sidebar-bottom">
+            <button class="sidebar-icon sidebar-avatar-btn" data-i18n-title="ttProfile" title="Профиль" onclick="openProfile()" id="sidebarProfileBtn">
+                <img id="sidebarAvatarImg" src="" alt="" style="display:none;width:36px;height:36px;border-radius:50%;object-fit:cover;">
+                <span id="sidebarAvatarEmoji">🧑</span>
+            </button>
+        </div>
+    </aside>
+
+    <section class="chat-panel">
+        <div class="chat-panel-header">
+            <h1 id="panelTitle" data-i18n="tabChats">Чаты</h1>
+            <div class="search-wrap">
+                <input type="search" id="searchInput" data-i18n-ph="searchPlaceholder" placeholder="Поиск..." oninput="onSearch()">
+            </div>
+        </div>
+        <div id="leftList" class="user-list"></div>
+    </section>
+
+    <section class="conversation-panel" id="conversationPanel">
+        <div class="conversation-empty" id="convEmpty">
+            <div>💬</div>
+            <div data-i18n="chooseChat">Выберите чат чтобы начать общение</div>
+        </div>
+    </section>
+
+</div>
+
+<div id="profileModal" class="modal hidden">
+    <div class="modal-box" id="profileModalBox">
+        <button class="lang-toggle-btn" id="profileLangToggle" onclick="toggleProfileLang()">RU</button>
+        <button class="close-btn" onclick="closeProfile()">✖</button>
+        <div class="profile-banner" id="profileBanner"></div>
+        <div class="avatar-section">
+            <div class="avatar-frame-wrap" id="avatarFrameWrap">
+                <img id="avatarImg" src="" alt="avatar" onerror="this.src='https://via.placeholder.com/100x100/476df0/ffffff?text=👤'">
+            </div>
+            <label for="avatarInput" class="avatar-change-btn" data-i18n="changePhoto">Сменить фото</label>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none">
+            <button class="avatar-change-btn" onclick="openChangePassword()" style="background:none;border:none;cursor:pointer;color:#476df0;font-size:13px;padding:0;margin-top:2px;" data-i18n="changePasswordBtn">Сменить пароль</button>
+        </div>
+        <div class="info">
+            <h2 id="profileNickModal">@ник</h2>
+            <p id="profileCountryModal">🌍 —</p>
+        </div>
+        <div class="id-box">
+            <div>
+                <small data-i18n="yourIdTitle">Твой ID для добавления в друзья</small>
+                <div id="profileIdCopy" class="id-value">—</div>
+            </div>
+            <button class="copy-btn" onclick="copyId()">📋</button>
+        </div>
+        <div class="time-box">
+            <div class="time-icon">⏱️</div>
+            <div>
+                <small data-i18n="timeOnSiteLabel">Время на сайте</small>
+                <div id="profileTimeValue" class="time-value">0 ч</div>
+            </div>
+        </div>
+        <button class="decorations-btn" onclick="openInventory()">🎒 <span data-i18n="myDecorations">Мои украшения</span></button>
+        <button class="logout-btn" onclick="logout()"> <span data-i18n="ttLogout">Выйти</span></button>
+    </div>
+</div>
+
+<!-- ИНВЕНТАРЬ -->
+<div id="inventoryModal" class="modal hidden">
+    <div class="modal-box shop-box">
+        <button class="close-btn" onclick="closeInventory()">✖</button>
+        <h2 class="shop-title">🎒 <span data-i18n="myDecorations">Мои украшения</span></h2>
+        <button class="go-to-shop-btn" onclick="closeInventory(); openShop();">
+            🛍️ <span data-i18n="goToShop">В магазин</span>
+        </button>
+        <div id="shopItemsList" class="shop-items-list" style="margin-top:12px"></div>
+    </div>
+</div>
+
+<!-- МАГАЗИН -->
+<div id="shopModal" class="modal hidden">
+    <div class="modal-box shop-box">
+        <button class="close-btn" onclick="closeShop()">✖</button>
+        <h2 class="shop-title" data-i18n="shopTitle">Магазин украшений</h2>
+        <div class="shop-time-badge">
+            ⏱️ <span data-i18n="yourTime">Ваше время:</span> <span id="shopTimeValue">0 ч</span>
+        </div>
+        <div id="shopItemsListShop" class="shop-items-list"></div>
+    </div>
+</div>
+
+<div id="addFriendModal" class="modal hidden">
+    <div class="modal-box">
+        <button class="close-btn" onclick="closeAddFriend()">✖</button>
+        <h2 style="color:#000;margin-top:0" data-i18n="addFriendTitle">Добавить друга</h2>
+        <p style="font-size:13px;color:#555" data-i18n="addFriendDesc">Введите ID пользователя</p>
+        <input type="text" id="friendIdInput" data-i18n-ph="friendIdPlaceholder" placeholder="123456789" class="modal-input" oninput="searchUserPreview()">
+        <div id="userPreview" class="user-preview hidden"></div>
+        <div id="addFriendMsg" class="modal-msg"></div>
+        <button class="modal-btn" onclick="addFriendById()" data-i18n="addFriendBtn">Добавить в друзья</button>
+    </div>
+</div>
+
+<div id="imageViewer" class="modal hidden" onclick="closeImageViewer()">
+    <div style="max-width:90vw;max-height:90vh;position:relative">
+        <img id="viewerImg" style="max-width:90vw;max-height:90vh;border-radius:12px;display:block">
+    </div>
+</div>
+
+<!-- ПОДТВЕРЖДЕНИЕ ВЫХОДА -->
+<!-- СМЕНА ПАРОЛЯ -->
+<div id="changePasswordModal" class="modal hidden">
+    <div class="modal-box">
+        <button class="close-btn" onclick="closeChangePassword()">✖</button>
+        <h2 style="color:#000;margin-top:0">🔑 <span data-i18n="changePasswordTitle">Смена пароля</span></h2>
+        <label style="display:block;font-size:14px;margin-top:14px;color:#222" data-i18n="oldPasswordLabel">Текущий пароль</label>
+        <input type="password" id="oldPasswordInput" class="modal-input" placeholder="текущий пароль">
+        <label style="display:block;font-size:14px;margin-top:12px;color:#222" data-i18n="newPasswordLabel">Новый пароль</label>
+        <input type="password" id="newPasswordInput" class="modal-input" placeholder="минимум 6 символов">
+        <label style="display:block;font-size:14px;margin-top:12px;color:#222" data-i18n="confirmNewPasswordLabel">Подтвердите новый пароль</label>
+        <input type="password" id="confirmNewPasswordInput" class="modal-input" placeholder="повторите пароль">
+        <div id="changePasswordMsg" class="modal-msg"></div>
+        <button class="modal-btn" onclick="submitChangePassword()" data-i18n="changePasswordSubmit">Сменить пароль</button>
+    </div>
+</div>
+
+<div id="logoutModal" class="modal hidden">
+    <div class="modal-box confirm-box">
+        <div class="confirm-icon"></div>
+        <h2 class="confirm-title" data-i18n="logoutTitle">Выйти из аккаунта?</h2>
+        <p class="confirm-desc" data-i18n="logoutDesc">Вы уверены что хотите выйти?</p>
+        <div class="confirm-btns">
+            <button class="confirm-btn-no" onclick="closeLogoutModal()" data-i18n="logoutNo">Нет</button>
+            <button class="confirm-btn-yes" onclick="confirmLogout()" data-i18n="logoutYes">Да, выйти</button>
+        </div>
+    </div>
+</div>
+
+<div id="pageLoader" class="page-loader hidden"><div class="loader-spinner"></div></div>
+<script src="work.js" type="module"></script>
+</body>
+</html>

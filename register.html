@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Werbs</title>
+<link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="./image/ChatGPT Image 25 июн. 2026 г., 22_43_20.png"">
+</head>
+<body class="auth-page">
+<div class="reg">
+    <div class="header-box">
+        <h1 data-i18n="regHeaderTitle">Зарегистрируйтесь</h1>
+        <p data-i18n="regHeaderDesc">Ник будет виден другим — выберите внимательно.</p>
+    </div>
+    <div class="form-box">
+        <form id="regForm">
+            <label for="nickname" data-i18n="labelNickname">Ник</label>
+            <input type="text" id="nickname" data-i18n-ph="placeholderNickname" placeholder="например: werbs_user" autocomplete="off">
+
+            <label for="password" data-i18n="labelPassword">Пароль</label>
+            <input type="password" id="password" data-i18n-ph="placeholderPassword" placeholder="минимум 6 символов">
+
+            <label for="confirmPassword" data-i18n="labelConfirmPassword">Подтвердите пароль</label>
+            <input type="password" id="confirmPassword" data-i18n-ph="placeholderConfirmPassword" placeholder="повторите пароль">
+
+            <label for="country" data-i18n="labelCountry">Страна</label>
+            <select id="country">
+                <option value="" data-i18n="selectCountry">Выберите страну</option>
+            </select>
+
+            <div class="checkbox">
+                <input type="checkbox" id="notBot">
+                <label for="notBot" data-i18n="notBot">Я не робот</label>
+            </div>
+
+            <div class="error" id="error"></div>
+            <button type="submit" data-i18n="regSubmit">Зарегистрироваться</button>
+        </form>
+        <div class="bottom-link">
+            <span data-i18n="haveAccount">Уже есть аккаунт?</span>
+            <a href="login.html" data-i18n="loginLink">Войти</a>
+        </div>
+    </div>
+</div>
+<div id="pageLoader" class="page-loader hidden"><div class="loader-spinner"></div></div>
+<script src="work.js" type="module"></script>
+</body>
+</html>
