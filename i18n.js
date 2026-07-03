@@ -6,7 +6,7 @@
 export const TRANSLATIONS = {
     ru: {
         // ── INDEX (стартовая) ──
-        welcomeTitle: "Добро пожаловать в Werbs",
+        welcomeTitle: "Добро пожаловать в Werbs (PC version)",
         welcomeDesc: "Добро пожаловать в Werbs — это сайт для общения с друзьями и новыми людьми, где можно переписываться и интересно проводить время.",
         welcomePolicyPre: "Ознакомьтесь с нашими",
         welcomePolicyLink: "политиками конфиденциальности",
@@ -146,7 +146,7 @@ export const TRANSLATIONS = {
 
     en: {
         // ── INDEX ──
-        welcomeTitle: "Welcome to Werbs",
+        welcomeTitle: "Welcome to Werbs (PC version)",
         welcomeDesc: "Welcome to Werbs — a place to chat with friends and meet new people, and have a great time.",
         welcomePolicyPre: "Check out our",
         welcomePolicyLink: "privacy policy",
