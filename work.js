@@ -353,6 +353,8 @@ async function initApp() {
     renderLeft();
     updateSidebarAvatar(); // показать аватарку в сайдбаре сразу при входе
     startTimeTracking();   // запускаем накопление времени на сайте
+    startPresence();       // онлайн-статус
+    watchFriendRequests(); // следить за входящими заявками
 
     fbOnSnapshot(fbDoc(db,"users",ME.id), snap => {
         if (!snap.exists()) return;
@@ -456,6 +458,7 @@ window.switchTab = function(tab) {
 };
 
 function resetConv() {
+    document.querySelector(".app-shell")?.classList.remove("chat-open");
     $("conversationPanel").innerHTML = `<div class="conversation-empty"><div>💬</div><div>${t("chooseChat")}</div></div>`;
 }
 
@@ -488,7 +491,7 @@ async function renderLeft() {
     const items = await Promise.all(filtered.map(async f => {
         let sub = currentTab==="friends" ? t("idLabel")+f.id : "";
         if (currentTab==="chats") {
-            try { 
+            try {
                 const key = chatKey(ME.id, f.id);
                 const msgsSnap = await new Promise(resolve => {
                     const q = fbQuery(fbCollection(db,"chats",key,"messages"), fbOrderBy("ts","desc"));
@@ -527,7 +530,9 @@ async function renderLeft() {
 // ─────────────────────────────────────────────
 window.openChat = async function(friendId) {
     activeChatId = friendId;
+    document.querySelector(".app-shell")?.classList.add("chat-open");
     if (chatUnsub) { chatUnsub(); chatUnsub=null; }
+    stopTyping();
 
     const friendSnap = await fbGetDoc(fbDoc(db,"users",friendId));
     if (!friendSnap.exists()) return;
@@ -535,42 +540,218 @@ window.openChat = async function(friendId) {
 
     const av = localStorage.getItem("w_av_"+friend.id);
     const avHtml = av
-        ? `<img src="${av}" class="chat-header-avatar">`
-        : `<div class="chat-header-avatar-placeholder">${friend.nick[0].toUpperCase()}</div>`;
-    const friendHasTopper = (friend.badges||[]).includes("topper");
-    const headerBadge = friendHasTopper ? ` <span class="badge-topper-small" title="${t('topperTooltip')}">🏆</span>` : "";
+        ? `<img src="${av}" class="chat-header-avatar" onclick="openUserProfile('${friend.id}')" style="cursor:pointer">`
+        : `<div class="chat-header-avatar-placeholder" onclick="openUserProfile('${friend.id}')" style="cursor:pointer">${friend.nick[0].toUpperCase()}</div>`;
+
+    const friendBadges = buildBadgesHtml(friend.badges||[], "small");
 
     $("conversationPanel").innerHTML = `
     <div class="chat-window">
-        <div class="chat-header">
-            ${avHtml}
+        <div class="chat-header" style="cursor:pointer">
+            <button class="back-btn" onclick="event.stopPropagation();activeChatId=null;if(chatUnsub){chatUnsub();chatUnsub=null;}document.querySelector('.app-shell')?.classList.remove('chat-open');document.querySelector('.chat-panel').style.display='';renderLeft()">‹</button>
+            <div onclick="openUserProfile('${friend.id}')" style="display:flex;align-items:center;gap:12px;flex:1">
+            <div class="chat-header-avatar-wrap">
+                ${avHtml}
+                <span class="online-dot hidden" id="friendOnlineDot"></span>
+            </div>
             <div>
-                <div class="chat-header-nick">@${escHtml(friend.nick)}${headerBadge}</div>
-                <div class="chat-header-sub">${t("idLabel")}${friend.id}</div>
+                <div class="chat-header-nick">@${escHtml(friend.nick)}${friendBadges}</div>
+                <div class="chat-header-sub" id="chatHeaderSub">${t("idLabel")}${friend.id}</div>
+            </div>
             </div>
         </div>
         <div class="chat-messages" id="chatMessages"><div class="msg-loading">…</div></div>
+        <div id="replyPreview" class="reply-preview hidden">
+            <div class="reply-preview-text" id="replyPreviewText"></div>
+            <button onclick="cancelReply()">✕</button>
+        </div>
         <div class="chat-attachments-preview" id="attachPreview"></div>
         <div class="chat-input-row">
             <button class="attach-btn" onclick="triggerAttach()">📎</button>
             <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
             <input type="text" id="msgInput" placeholder="${t('msgPlaceholder')}"
+                oninput="onTyping()"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
             <button class="send-btn" onclick="sendMsg()">➤</button>
         </div>
     </div>`;
 
+    // Онлайн-статус собеседника
+    watchFriendOnline(friendId);
+
     const key = chatKey(ME.id, friendId);
     const q   = fbQuery(fbCollection(db,"chats",key,"messages"), fbOrderBy("ts","asc"));
     chatUnsub = fbOnSnapshot(q, snap => {
-        const msgs = snap.docs.map(d=>d.data());
+        const msgs = snap.docs.map(d=>({ ...d.data(), _id: d.id }));
         renderMessages(msgs);
     });
+
+    // Следить за статусом "печатает"
+    watchTyping(friendId);
 
     $("msgInput")?.focus();
     renderLeft();
 };
-document.querySelector(".app-shell")?.classList.add("chat-open");
+
+// Построить html бейджей
+function buildBadgesHtml(badges, size) {
+    let html = "";
+    const cls = size==="small" ? "badge-topper-small" : "badge-topper";
+    if (badges.includes("creator")) html += ` <span class="${cls}" title="${t('creatorTooltip')}">🔨</span>`;
+    if (badges.includes("admin"))   html += ` <span class="${cls}" title="${t('adminTooltip')}">👑</span>`;
+    if (badges.includes("gear"))    html += ` <span class="${cls}" title="Настройщик Werbs">⚙️</span>`;
+    if (badges.includes("topper"))  html += ` <span class="${cls}" title="${t('topperTooltip')}">🏆</span>`;
+    return html;
+}
+
+// ─── ОНЛАЙН-СТАТУС ───
+let onlineUnsub = null;
+function watchFriendOnline(friendId) {
+    if (onlineUnsub) { onlineUnsub(); onlineUnsub=null; }
+    onlineUnsub = fbOnSnapshot(fbDoc(db,"presence",friendId), snap => {
+        const dot = $("friendOnlineDot");
+        const sub = $("chatHeaderSub");
+        if (!dot) return;
+        const isOnline = snap.exists() && snap.data().online === true;
+        if (isOnline) {
+            dot.classList.remove("hidden");
+            if (sub) sub.textContent = getLang()==="en" ? "Online" : "В сети";
+        } else {
+            dot.classList.add("hidden");
+            if (sub && activeChatId) sub.textContent = t("idLabel")+friendId;
+        }
+    });
+}
+
+// Обновлять свой онлайн-статус
+let onlineInterval = null;
+function startPresence() {
+    const setOnline = () => {
+        if (!ME) return;
+        fbSetDoc(fbDoc(db,"presence",ME.id), { online: true, ts: Date.now() }).catch(()=>{});
+    };
+    setOnline();
+    onlineInterval = setInterval(setOnline, 30000);
+    window.addEventListener("beforeunload", () => {
+        fbSetDoc(fbDoc(db,"presence",ME.id), { online: false, ts: Date.now() }).catch(()=>{});
+    });
+    document.addEventListener("visibilitychange", () => {
+        fbSetDoc(fbDoc(db,"presence",ME.id), { online: !document.hidden, ts: Date.now() }).catch(()=>{});
+    });
+}
+
+// ─── ПЕЧАТАЕТ... ───
+let typingTimeout = null;
+let typingUnsub = null;
+
+function onTyping() {
+    if (!activeChatId || !ME) return;
+    fbSetDoc(fbDoc(db,"typing",chatKey(ME.id,activeChatId)+"_"+ME.id), { uid: ME.id, ts: Date.now() }).catch(()=>{});
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(stopTyping, 3000);
+}
+
+function stopTyping() {
+    if (!activeChatId || !ME) return;
+    fbSetDoc(fbDoc(db,"typing",chatKey(ME.id,activeChatId)+"_"+ME.id), { uid: ME.id, ts: 0 }).catch(()=>{});
+}
+
+function watchTyping(friendId) {
+    if (typingUnsub) { typingUnsub(); typingUnsub=null; }
+    const docId = chatKey(ME.id,friendId)+"_"+friendId;
+    typingUnsub = fbOnSnapshot(fbDoc(db,"typing",docId), snap => {
+        const sub = $("chatHeaderSub");
+        if (!sub) return;
+        const data = snap.exists() ? snap.data() : null;
+        const isTyping = data && data.ts && (Date.now() - data.ts) < 4000;
+        if (isTyping) {
+            sub.textContent = getLang()==="en" ? "typing..." : "печатает...";
+            sub.style.color = "#6e8dfb";
+        } else {
+            sub.style.color = "";
+            const dot = $("friendOnlineDot");
+            sub.textContent = (dot && !dot.classList.contains("hidden"))
+                ? (getLang()==="en" ? "Online" : "В сети")
+                : t("idLabel")+friendId;
+        }
+    });
+}
+
+// ─── ОТВЕТ НА СООБЩЕНИЕ ───
+let replyTo = null;
+
+window.setReply = function(msgId, text) {
+    replyTo = { msgId, text };
+    const preview = $("replyPreview");
+    const previewText = $("replyPreviewText");
+    if (preview && previewText) {
+        previewText.textContent = truncate(text, 60);
+        preview.classList.remove("hidden");
+    }
+    $("msgInput")?.focus();
+};
+
+window.cancelReply = function() {
+    replyTo = null;
+    $("replyPreview")?.classList.add("hidden");
+};
+
+// ─── РЕАКЦИИ ───
+const REACTIONS = ["👍","❤️","😂","😮","😢","🙏","🔥","👏"];
+
+window.showReactions = function(msgId, event) {
+    event.stopPropagation();
+    // Убрать старый picker если есть
+    document.querySelectorAll(".reaction-picker").forEach(e=>e.remove());
+
+    const picker = document.createElement("div");
+    picker.className = "reaction-picker";
+    picker.innerHTML = REACTIONS.map(e =>
+        `<button class="reaction-btn" onclick="addReaction('${msgId}','${e}',event)">${e}</button>`
+    ).join("");
+
+    const bubble = document.querySelector(`[data-msgid="${msgId}"]`);
+    if (bubble) {
+        bubble.style.position="relative";
+        bubble.appendChild(picker);
+        setTimeout(() => document.addEventListener("click", ()=>picker.remove(), {once:true}), 100);
+    }
+};
+
+window.addReaction = async function(msgId, emoji, event) {
+    event.stopPropagation();
+    document.querySelectorAll(".reaction-picker").forEach(e=>e.remove());
+    if (!activeChatId || !msgId) return;
+    const key = chatKey(ME.id, activeChatId);
+    const msgRef = fbDoc(db,"chats",key,"messages",msgId);
+    try {
+        const snap = await fbGetDoc(msgRef);
+        if (!snap.exists()) return;
+        const reactions = snap.data().reactions || {};
+        const users = reactions[emoji] || [];
+        let newUsers;
+        if (users.includes(ME.id)) {
+            newUsers = users.filter(u=>u!==ME.id); // убрать
+        } else {
+            newUsers = [...users, ME.id]; // добавить
+        }
+        const newReactions = { ...reactions, [emoji]: newUsers };
+        await fbUpdateDoc(msgRef, { reactions: newReactions });
+    } catch(e) {}
+};
+
+// ─── УДАЛЕНИЕ СООБЩЕНИЯ ───
+window.deleteMsg = async function(msgId, event) {
+    event.stopPropagation();
+    if (!activeChatId || !msgId) return;
+    if (!confirm(getLang()==="en"?"Delete this message?":"Удалить сообщение?")) return;
+    const key = chatKey(ME.id, activeChatId);
+    try {
+        const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        await deleteDoc(fbDoc(db,"chats",key,"messages",msgId));
+    } catch(e) {}
+};
+
 function renderMessages(msgs) {
     const container = $("chatMessages");
     if (!container) return;
@@ -585,6 +766,8 @@ function renderMessages(msgs) {
         const isMe = m.from===ME.id;
         const side = isMe?"msg-me":"msg-them";
         const time = m.ts ? fmtTime(m.ts) : "";
+        const msgId = m._id || "";
+
         let content = "";
         if (m.type==="image") {
             content = `<img src="${m.data}" class="msg-img" onclick="openImageViewer('${m.data}')" alt="photo">`;
@@ -597,7 +780,34 @@ function renderMessages(msgs) {
         } else {
             content = `<span>${escHtml(m.text||"")}</span>`;
         }
-        return `<div class="msg-bubble ${side}">${content}<small class="msg-time">${time}</small></div>`;
+
+        // Цитата (reply)
+        let replyHtml = "";
+        if (m.replyTo) {
+            replyHtml = `<div class="msg-reply-quote">${escHtml(truncate(m.replyTo.text||"",50))}</div>`;
+        }
+
+        // Реакции
+        const reactions = m.reactions || {};
+        const reactHtml = Object.entries(reactions)
+            .filter(([,users])=>users.length>0)
+            .map(([emoji,users])=>`<span class="reaction-chip${users.includes(ME.id)?" me":""}" onclick="addReaction('${msgId}','${emoji}',event)" title="${users.length}">${emoji} ${users.length}</span>`)
+            .join("");
+
+        // Кнопки действий
+        const actions = `<div class="msg-actions">
+            <button class="msg-action-btn" onclick="showReactions('${msgId}',event)" title="Реакция">😊</button>
+            <button class="msg-action-btn" onclick="setReply('${msgId}','${escHtml(m.text||"фото")}')" title="Ответить">↩</button>
+            ${isMe ? `<button class="msg-action-btn" onclick="deleteMsg('${msgId}',event)" title="Удалить">🗑</button>` : ""}
+        </div>`;
+
+        return `<div class="msg-bubble ${side}" data-msgid="${msgId}">
+            ${replyHtml}
+            ${content}
+            <small class="msg-time">${time}</small>
+            ${actions}
+            ${reactHtml ? `<div class="reactions-row">${reactHtml}</div>` : ""}
+        </div>`;
     }).join("");
 
     if (wasAtBottom) setTimeout(()=>{ container.scrollTop=container.scrollHeight; },40);
@@ -641,6 +851,7 @@ window.sendMsg = async function() {
     const text  = input?.value.trim();
     if (!text && !pendingFiles.length) return;
 
+    stopTyping();
     const key = chatKey(ME.id, activeChatId);
     const col = fbCollection(db,"chats",key,"messages");
 
@@ -648,12 +859,15 @@ window.sendMsg = async function() {
     pendingFiles = [];
     renderAttachPreview();
 
+    const replyData = replyTo ? { msgId: replyTo.msgId, text: replyTo.text } : null;
+    cancelReply();
+
     for (const f of filesToSend) {
-        await fbAddDoc(col, { from:ME.id, type:f.type, data:f.data, name:f.name, size:f.size, ts:fbServerTimestamp() });
+        await fbAddDoc(col, { from:ME.id, type:f.type, data:f.data, name:f.name, size:f.size, ts:fbServerTimestamp(), ...(replyData?{replyTo:replyData}:{}) });
     }
     if (text) {
         if (input) input.value="";
-        await fbAddDoc(col, { from:ME.id, type:"text", text, ts:fbServerTimestamp() });
+        await fbAddDoc(col, { from:ME.id, type:"text", text, ts:fbServerTimestamp(), ...(replyData?{replyTo:replyData}:{}) });
     }
 };
 
@@ -800,20 +1014,153 @@ window.addFriendById = async function() {
         if (!snap.exists()) { msgEl.textContent=t("errUserNotFound"); btn.textContent=originalLabel; btn.disabled=false; return; }
         const friend = snap.data();
 
-        await fbUpdateDoc(fbDoc(db,"users",ME.id),    { friends: fbArrayUnion(friendId) });
-        await fbUpdateDoc(fbDoc(db,"users",friendId), { friends: fbArrayUnion(ME.id)    });
-
-        ME.friends = [...(ME.friends||[]), friendId];
-        sessionStorage.setItem("w_me", JSON.stringify(ME));
+        // Отправить заявку в друзья вместо мгновенного добавления
+        await fbSetDoc(fbDoc(db,"friendRequests",friendId+"_from_"+ME.id), {
+            from: ME.id, fromNick: ME.nick, to: friendId, ts: Date.now(), status: "pending"
+        });
 
         msgEl.className="modal-msg success";
-        msgEl.textContent=t("friendAdded",{nick:"@"+friend.nick});
-        renderLeft();
-        setTimeout(closeAddFriend, 1500);
+        msgEl.textContent = getLang()==="en"
+            ? `✅ Friend request sent to @${friend.nick}!`
+            : `✅ Заявка отправлена @${friend.nick}!`;
+        setTimeout(closeAddFriend, 1800);
     } catch(e) {
         msgEl.textContent=t("errGeneric")+e.message;
     }
     btn.textContent=originalLabel; btn.disabled=false;
+};
+
+// ─── ВХОДЯЩИЕ ЗАЯВКИ ───
+let requestsUnsub = null;
+
+function watchFriendRequests() {
+    if (requestsUnsub) { requestsUnsub(); requestsUnsub=null; }
+    const q = fbQuery(fbCollection(db,"friendRequests"), fbWhere("to","==",ME.id), fbWhere("status","==","pending"));
+    requestsUnsub = fbOnSnapshot(q, snap => {
+        const count = snap.size;
+        const btn = $("btn-requests");
+        if (btn) {
+            btn.style.display = count > 0 ? "flex" : "none";
+            const badge = btn.querySelector(".req-badge");
+            if (badge) badge.textContent = count;
+        }
+    });
+}
+
+window.openRequests = async function() {
+    const q = fbQuery(fbCollection(db,"friendRequests"), fbWhere("to","==",ME.id), fbWhere("status","==","pending"));
+    const snap = await new Promise(r => fbOnSnapshot(q, r, {once:true}));
+
+    const modal = $("requestsModal");
+    const list  = $("requestsList");
+    if (!modal || !list) return;
+    modal.classList.remove("hidden");
+
+    if (snap.empty) {
+        list.innerHTML = `<div style="text-align:center;color:#888;padding:20px">${getLang()==="en"?"No friend requests":"Нет заявок в друзья"}</div>`;
+        return;
+    }
+
+    list.innerHTML = snap.docs.map(d => {
+        const req = d.data();
+        const av = localStorage.getItem("w_av_"+req.from);
+        const avHtml = av ? `<img src="${av}" class="friend-avatar">` : `<div class="friend-avatar-placeholder">${req.fromNick[0].toUpperCase()}</div>`;
+        return `<div class="friend-item" style="cursor:default">
+            ${avHtml}
+            <div class="friend-info">
+                <div class="friend-nick">@${escHtml(req.fromNick)}</div>
+                <div class="friend-sub">ID: ${req.from}</div>
+            </div>
+            <div style="display:flex;gap:6px;margin-left:auto">
+                <button class="shop-item-btn can-buy" style="padding:6px 12px" onclick="acceptRequest('${d.id}','${req.from}')">✅</button>
+                <button class="shop-item-btn cant-buy" style="padding:6px 12px;cursor:pointer" onclick="declineRequest('${d.id}')">✖</button>
+            </div>
+        </div>`;
+    }).join("");
+};
+
+window.closeRequests = () => $("requestsModal")?.classList.add("hidden");
+
+window.acceptRequest = async function(docId, fromId) {
+    try {
+        await fbUpdateDoc(fbDoc(db,"friendRequests",docId), { status: "accepted" });
+        await fbUpdateDoc(fbDoc(db,"users",ME.id),   { friends: fbArrayUnion(fromId) });
+        await fbUpdateDoc(fbDoc(db,"users",fromId),  { friends: fbArrayUnion(ME.id)  });
+        ME.friends = [...(ME.friends||[]), fromId];
+        sessionStorage.setItem("w_me", JSON.stringify(ME));
+        renderLeft();
+        openRequests();
+    } catch(e) {}
+};
+
+window.declineRequest = async function(docId) {
+    try {
+        await fbUpdateDoc(fbDoc(db,"friendRequests",docId), { status: "declined" });
+        openRequests();
+    } catch(e) {}
+};
+
+// ─── ПРОФИЛЬ СОБЕСЕДНИКА ───
+window.openUserProfile = async function(userId) {
+    const snap = await fbGetDoc(fbDoc(db,"users",userId));
+    if (!snap.exists()) return;
+    const user = snap.data();
+
+    const modal = $("userProfileModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+
+    const av = localStorage.getItem("w_av_"+userId);
+    const avHtml = av ? `<img src="${av}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #476df0">` : `<div style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#476df0,#7b5ef8);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:#fff">${user.nick[0].toUpperCase()}</div>`;
+
+    const badges = buildBadgesHtml(user.badges||[], "normal");
+    const isFriend = (ME.friends||[]).includes(userId);
+    const isMe = userId === ME.id;
+
+    const onlineSnap = await fbGetDoc(fbDoc(db,"presence",userId));
+    const isOnline = onlineSnap.exists() && onlineSnap.data().online === true;
+    const onlineBadge = isOnline ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:4px"></span>${getLang()==="en"?"Online":"В сети"}` : (getLang()==="en"?"Offline":"Не в сети");
+
+    // Применённый фон
+    const banner = user.equippedBanner ? SHOP_ITEMS.find(i=>i.id===user.equippedBanner) : null;
+    const bannerStyle = banner ? `style="background:${banner.preview}"` : "";
+
+    modal.querySelector(".up-content").innerHTML = `
+        <div class="up-banner" ${bannerStyle}></div>
+        <div class="up-body">
+            <div class="up-avatar">${avHtml}</div>
+            <div class="up-nick">@${escHtml(user.nick)} ${badges}</div>
+            <div class="up-status">${onlineBadge}</div>
+            <div class="up-country">🌍 ${localizedCountry(user.country)||"—"}</div>
+            <div class="up-id">ID: ${user.id}</div>
+            ${!isMe && isFriend ? `<button class="logout-btn" style="margin-top:12px" onclick="removeFriend('${userId}')">🗑 ${getLang()==="en"?"Remove friend":"Удалить из друзей"}</button>` : ""}
+            ${!isMe && !isFriend ? `<button class="modal-btn" style="margin-top:12px" onclick="sendRequestFromProfile('${userId}','${escHtml(user.nick)}')">➕ ${getLang()==="en"?"Add friend":"Добавить в друзья"}</button>` : ""}
+        </div>`;
+};
+
+window.closeUserProfile = () => $("userProfileModal")?.classList.add("hidden");
+
+window.removeFriend = async function(userId) {
+    if (!confirm(getLang()==="en"?"Remove this friend?":"Удалить из друзей?")) return;
+    try {
+        const { arrayRemove } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        await fbUpdateDoc(fbDoc(db,"users",ME.id),   { friends: arrayRemove(userId) });
+        await fbUpdateDoc(fbDoc(db,"users",userId),  { friends: arrayRemove(ME.id)  });
+        ME.friends = (ME.friends||[]).filter(f=>f!==userId);
+        sessionStorage.setItem("w_me", JSON.stringify(ME));
+        closeUserProfile();
+        renderLeft();
+    } catch(e) {}
+};
+
+window.sendRequestFromProfile = async function(userId, nick) {
+    try {
+        await fbSetDoc(fbDoc(db,"friendRequests",userId+"_from_"+ME.id), {
+            from: ME.id, fromNick: ME.nick, to: userId, ts: Date.now(), status: "pending"
+        });
+        alert(getLang()==="en" ? `Friend request sent to @${nick}!` : `Заявка отправлена @${nick}!`);
+        closeUserProfile();
+    } catch(e) {}
 };
 
 // ─────────────────────────────────────────────

@@ -1076,8 +1076,195 @@ body.auth-page {
 }
 .go-to-shop-btn:hover { opacity: 0.88; }
 
+/* ══════════════════════════════════════
+   ОНЛАЙН-СТАТУС
+══════════════════════════════════════ */
+.chat-header-avatar-wrap { position: relative; display: inline-block; }
+.online-dot {
+    position: absolute;
+    bottom: 1px; right: 1px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #23263a;
+}
+.friend-item-online { position: relative; }
+.friend-online-dot {
+    position: absolute;
+    bottom: 1px; right: 1px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #23263a;
+}
 
-@media (max-width: 768px) {
+/* ══════════════════════════════════════
+   РЕАКЦИИ
+══════════════════════════════════════ */
+.reaction-picker {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    background: #2e3250;
+    border-radius: 999px;
+    padding: 6px 10px;
+    display: flex;
+    gap: 4px;
+    z-index: 50;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    white-space: nowrap;
+}
+.reaction-btn {
+    border: none;
+    background: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 6px;
+    transition: transform .1s;
+}
+.reaction-btn:hover { transform: scale(1.3); }
+.reactions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+.reaction-chip {
+    background: rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s;
+}
+.reaction-chip.me { background: rgba(71,109,240,0.35); }
+.reaction-chip:hover { background: rgba(255,255,255,0.2); }
+
+/* ══════════════════════════════════════
+   ДЕЙСТВИЯ С СООБЩЕНИЕМ
+══════════════════════════════════════ */
+.msg-bubble { position: relative; }
+.msg-actions {
+    display: none;
+    position: absolute;
+    top: -32px;
+    right: 0;
+    background: #2e3250;
+    border-radius: 8px;
+    padding: 3px 6px;
+    gap: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    z-index: 10;
+    white-space: nowrap;
+}
+.msg-bubble:hover .msg-actions { display: flex; }
+.msg-action-btn {
+    border: none;
+    background: none;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    opacity: 0.8;
+    transition: opacity .1s;
+}
+.msg-action-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+
+/* ══════════════════════════════════════
+   ОТВЕТ НА СООБЩЕНИЕ
+══════════════════════════════════════ */
+.reply-preview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: rgba(71,109,240,0.15);
+    border-left: 3px solid #476df0;
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+}
+.reply-preview button {
+    border: none;
+    background: none;
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    font-size: 16px;
+}
+.msg-reply-quote {
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    border-left: 2px solid #476df0;
+    padding-left: 6px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ══════════════════════════════════════
+   ПРОФИЛЬ СОБЕСЕДНИКА
+══════════════════════════════════════ */
+.up-banner {
+    height: 90px;
+    background: linear-gradient(135deg, #2c2f48, #23263a);
+}
+.up-body { padding: 16px 24px 24px; text-align: center; }
+.up-avatar { margin-top: -50px; margin-bottom: 8px; }
+.up-nick { font-size: 18px; font-weight: 700; color: #000; margin-bottom: 4px; }
+.up-status { font-size: 13px; color: #666; margin-bottom: 4px; }
+.up-country { font-size: 13px; color: #555; margin-bottom: 4px; }
+.up-id { font-size: 12px; color: #aaa; }
+
+/* ══════════════════════════════════════
+   ЗНАЧОК ЗАЯВОК
+══════════════════════════════════════ */
+.req-badge {
+    position: absolute;
+    top: 2px; right: 2px;
+    background: #ff4d4d;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    min-width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+}
+
+/* ══════════════════════════════════════
+   ВЕРСИЯ BETA
+══════════════════════════════════════ */
+.version-badge {
+    margin-top: 10px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.5px;
+}
+
+/* ══════════════════════════════════════
+   КНОПКА НАЗАД (мобиле)
+══════════════════════════════════════ */
+.back-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 26px;
+    cursor: pointer;
+    padding: 0 10px 0 0;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+/* ══════════════════════════════════════
+   МОБИЛЬНАЯ ВЕРСИЯ — планшеты
+══════════════════════════════════════ */
+@media (max-width: 900px) {
     .app-shell {
         grid-template-columns: 56px 1fr;
     }
@@ -1091,31 +1278,34 @@ body.auth-page {
         display: flex;
         grid-column: 2;
     }
-    .chat-panel {
-        min-width: 0;
-    }
-    .modal-box {
-        width: 95vw;
-        max-width: 95vw;
-    }
-    .shop-box {
-        width: 95vw;
-    }
-    .sidebar-icon {
-        width: 40px;
-        height: 40px;
-        font-size: 18px;
-    }
+    .back-btn { display: block; }
+    .modal-box { width: 94vw; max-width: 94vw; }
+    .shop-box  { width: 94vw; }
+    .reg { width: 90vw; max-width: 480px; }
 }
 
+/* ══════════════════════════════════════
+   МОБИЛЬНАЯ ВЕРСИЯ — телефоны
+══════════════════════════════════════ */
 @media (max-width: 480px) {
-    .app-shell {
-        grid-template-columns: 48px 1fr;
-    }
-    .friend-nick {
-        font-size: 13px;
-    }
-    .friend-sub {
-        font-size: 11px;
-    }
+    .app-shell { grid-template-columns: 48px 1fr; }
+    .sidebar-icon { width: 38px; height: 38px; font-size: 17px; }
+    .friend-nick { font-size: 13px; }
+    .friend-sub  { font-size: 11px; }
+    .chat-input-row input[type="text"] { font-size: 13px; }
+    .msg-bubble { max-width: 88%; font-size: 13px; }
+    .chat-panel-header h1 { font-size: 1.1rem; }
+    .modal-box { width: 96vw; padding: 20px 16px; }
+    .confirm-box { padding: 24px 16px; }
+    .up-banner { height: 70px; }
+    .reg { width: 96vw; padding: 10px; }
+    .header-box { padding: 16px; }
+    .form-box { padding: 16px; }
+}
+
+/* ══════════════════════════════════════
+   МОБИЛЬНАЯ — регистрация/вход
+══════════════════════════════════════ */
+@media (max-width: 480px) {
+    body.auth-page { padding: 10px; align-items: flex-start; padding-top: 30px; }
 }
