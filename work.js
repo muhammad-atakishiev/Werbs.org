@@ -67,6 +67,102 @@ const fmtTime = ts => { const d = ts?.toDate ? ts.toDate() : new Date(ts); retur
 const fmtSize = b => !b ? "" : b<1024 ? b+" B" : b<1048576 ? (b/1024).toFixed(1)+" KB" : (b/1048576).toFixed(1)+" MB";
 const truncate = (s,n) => s.length>n ? s.slice(0,n)+"…" : s;
 
+// Ключ дня (для группировки сообщений по дате): "2026-07-08"
+const dayKey = ts => {
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+};
+
+// Текст разделителя даты: Сегодня / Вчера / День недели / полная дата
+function fmtDateSeparator(ts) {
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    const now = new Date();
+    const startOfDay = dt => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+    const en = getLang()==="en";
+
+    if (diffDays === 0) return en ? "Today" : "Сегодня";
+    if (diffDays === 1) return en ? "Yesterday" : "Вчера";
+
+    if (diffDays > 1 && diffDays < 7) {
+        const weekdaysRu = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+        const weekdaysEn = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        return en ? weekdaysEn[d.getDay()] : weekdaysRu[d.getDay()];
+    }
+
+    const monthsRu = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+    const monthsEn = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const sameYear = d.getFullYear() === now.getFullYear();
+    const day = d.getDate();
+    const month = en ? monthsEn[d.getMonth()] : monthsRu[d.getMonth()];
+    return sameYear ? `${day} ${month}` : `${day} ${month} ${d.getFullYear()}`;
+}
+
+// ─── АВАТАРКИ + РАМКИ (хранятся в Firestore, видны у всех) ───
+// Достаём градиент применённой рамки конкретного пользователя (не только ME)
+function frameGradientFor(user) {
+    const id = user?.equippedFrame;
+    if (!id) return null;
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    return item ? item.preview : null;
+}
+
+// Строит аватарку (фото или буква) + рамку-украшение вокруг неё, любого размера
+function buildAvatarWrap(user, size, opts={}) {
+    const { imgClass="", placeholderClass="", onclick="" } = opts;
+    const gradient = frameGradientFor(user);
+    const clickAttr = onclick ? ` onclick="${onclick}" style="cursor:pointer"` : "";
+    const letter = (user?.nick?.[0] || "?").toUpperCase();
+    const inner = user?.avatar
+        ? `<img src="${user.avatar}" class="${imgClass}"${clickAttr}>`
+        : `<div class="${placeholderClass}"${clickAttr}>${letter}</div>`;
+    const style = gradient
+        ? `width:${size}px;height:${size}px;--frame-gradient:${gradient}`
+        : `width:${size}px;height:${size}px`;
+    return `<div class="avatar-frame-wrap${gradient?" has-frame":""}" style="${style}">${inner}</div>`;
+}
+
+// Переключает свою аватарку в профиле между фото и буквой-заглушкой (без внешних картинок)
+function setAvatarDisplay(av, img, placeholder) {
+    if (!img || !placeholder) return;
+    if (av) {
+        img.src = av;
+        img.style.display = "block";
+        placeholder.style.display = "none";
+    } else {
+        img.style.display = "none";
+        placeholder.style.display = "flex";
+        placeholder.textContent = (ME?.nick?.[0] || "?").toUpperCase();
+    }
+}
+
+// Сжимает загруженное фото перед сохранением в Firestore (чтобы не превысить лимит документа)
+function resizeImageFile(file, maxDim=256, quality=0.82) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const img = new Image();
+            img.onload = () => {
+                let { width, height } = img;
+                if (width > height) {
+                    if (width > maxDim) { height = Math.round(height * maxDim/width); width = maxDim; }
+                } else {
+                    if (height > maxDim) { width = Math.round(width * maxDim/height); height = maxDim; }
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = width; canvas.height = height;
+                canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL("image/jpeg", quality));
+            };
+            img.onerror = reject;
+            img.src = ev.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 function generateId(used=[]) {
     let id;
     do { id = Math.floor(100000000 + Math.random() * 900000000).toString(); } while(used.includes(id));
@@ -507,10 +603,7 @@ async function renderLeft() {
                 }
             } catch(e) {}
         }
-        const av = localStorage.getItem("w_av_"+f.id);
-        const avHtml = av
-            ? `<img src="${av}" class="friend-avatar">`
-            : `<div class="friend-avatar-placeholder">${f.nick[0].toUpperCase()}</div>`;
+        const avHtml = buildAvatarWrap(f, 44, { imgClass:"friend-avatar", placeholderClass:"friend-avatar-placeholder" });
         const isActive = activeChatId===f.id?" active":"";
         const fHasTopper = (f.badges||[]).includes("topper");
         const badgeHtml = fHasTopper ? ` <span class="badge-topper-small" title="${t('topperTooltip')}">🏆</span>` : "";
@@ -538,10 +631,7 @@ window.openChat = async function(friendId) {
     if (!friendSnap.exists()) return;
     const friend = friendSnap.data();
 
-    const av = localStorage.getItem("w_av_"+friend.id);
-    const avHtml = av
-        ? `<img src="${av}" class="chat-header-avatar" onclick="openUserProfile('${friend.id}')" style="cursor:pointer">`
-        : `<div class="chat-header-avatar-placeholder" onclick="openUserProfile('${friend.id}')" style="cursor:pointer">${friend.nick[0].toUpperCase()}</div>`;
+    const avHtml = buildAvatarWrap(friend, 40, { imgClass:"chat-header-avatar", placeholderClass:"chat-header-avatar-placeholder", onclick:`openUserProfile('${friend.id}')` });
 
     const friendBadges = buildBadgesHtml(friend.badges||[], "small");
 
@@ -762,11 +852,22 @@ function renderMessages(msgs) {
         return;
     }
 
+    let lastDayKey = null;
     container.innerHTML = msgs.map(m => {
         const isMe = m.from===ME.id;
         const side = isMe?"msg-me":"msg-them";
         const time = m.ts ? fmtTime(m.ts) : "";
         const msgId = m._id || "";
+
+        // Разделитель даты перед первым сообщением нового дня
+        let dateSepHtml = "";
+        if (m.ts) {
+            const k = dayKey(m.ts);
+            if (k !== lastDayKey) {
+                lastDayKey = k;
+                dateSepHtml = `<div class="date-separator"><span>${fmtDateSeparator(m.ts)}</span></div>`;
+            }
+        }
 
         let content = "";
         if (m.type==="image") {
@@ -801,7 +902,7 @@ function renderMessages(msgs) {
             ${isMe ? `<button class="msg-action-btn" onclick="deleteMsg('${msgId}',event)" title="Удалить">🗑</button>` : ""}
         </div>`;
 
-        return `<div class="msg-bubble ${side}" data-msgid="${msgId}">
+        return `${dateSepHtml}<div class="msg-bubble ${side}" data-msgid="${msgId}">
             ${replyHtml}
             ${content}
             <small class="msg-time">${time}</small>
@@ -887,9 +988,10 @@ window.openProfile = function() {
     renderEquippedBadgesInProfile();
     $("profileCountryModal").textContent = "🌍 "+(localizedCountry(ME.country)||"—");
     $("profileIdCopy").textContent       = ME.id;
-    const av = localStorage.getItem("w_av_"+ME.id);
+    const av = ME.avatar || localStorage.getItem("w_av_"+ME.id);
     const img = $("avatarImg");
-    if (img) img.src = av||"https://via.placeholder.com/100x100/476df0/ffffff?text=👤";
+    const placeholder = $("avatarPlaceholder");
+    setAvatarDisplay(av, img, placeholder);
 
     // Время на сайте
     $("profileTimeValue").textContent = formatHours(ME.timeSeconds);
@@ -902,17 +1004,21 @@ window.openProfile = function() {
     updateSidebarAvatar();
 
     const inp = $("avatarInput");
-    if (inp) inp.onchange = e => {
+    if (inp) inp.onchange = async e => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-            localStorage.setItem("w_av_"+ME.id, ev.target.result);
-            if (img) img.src = ev.target.result;
+        try {
+            const dataUrl = await resizeImageFile(file, 256, 0.82);
+            setAvatarDisplay(dataUrl, img, placeholder);
+            localStorage.setItem("w_av_"+ME.id, dataUrl); // локальный кэш для мгновенного отображения
+            ME.avatar = dataUrl;
+            sessionStorage.setItem("w_me", JSON.stringify(ME));
             updateSidebarAvatar(); // обновить сайдбар сразу после смены
             renderLeft();
-        };
-        reader.readAsDataURL(file);
+            await fbUpdateDoc(fbDoc(db,"users",ME.id), { avatar: dataUrl }); // синхронизация на все устройства
+        } catch(err) {
+            alert(getLang()==="en" ? "Failed to upload avatar" : "Не удалось загрузить аватар");
+        }
     };
 
     // Кнопка-переключатель языка (показывает текущий язык)
@@ -943,7 +1049,7 @@ window.toggleProfileLang = async function() {
 
 // Обновить аватарку в кнопке сайдбара
 function updateSidebarAvatar() {
-    const av      = localStorage.getItem("w_av_"+ME.id);
+    const av      = ME.avatar || localStorage.getItem("w_av_"+ME.id);
     const imgEl   = $("sidebarAvatarImg");
     const emojiEl = $("sidebarAvatarEmoji");
     if (!imgEl || !emojiEl) return;
@@ -987,8 +1093,7 @@ window.searchUserPreview = async function() {
         const snap = await fbGetDoc(fbDoc(db,"users",friendId));
         if (!snap.exists()||friendId===ME.id) { preview?.classList.add("hidden"); return; }
         const f = snap.data();
-        const av = localStorage.getItem("w_av_"+f.id);
-        const avHtml = av ? `<img src="${av}" class="friend-avatar">` : `<div class="friend-avatar-placeholder">${f.nick[0].toUpperCase()}</div>`;
+        const avHtml = buildAvatarWrap(f, 44, { imgClass:"friend-avatar", placeholderClass:"friend-avatar-placeholder" });
         const already = (ME.friends||[]).includes(f.id);
         const fHasTopperP = (f.badges||[]).includes("topper");
         const badgeHtmlP = fHasTopperP ? ` <span class="badge-topper-small" title="${t('topperTooltip')}">🏆</span>` : "";
@@ -1061,10 +1166,17 @@ window.openRequests = async function() {
         return;
     }
 
+    const senderIds = snap.docs.map(d => d.data().from);
+    let senderDocs = {};
+    try {
+        const senderSnaps = await Promise.all(senderIds.map(id => fbGetDoc(fbDoc(db,"users",id))));
+        senderSnaps.forEach(s => { if (s.exists()) senderDocs[s.id] = s.data(); });
+    } catch(e) {}
+
     list.innerHTML = snap.docs.map(d => {
         const req = d.data();
-        const av = localStorage.getItem("w_av_"+req.from);
-        const avHtml = av ? `<img src="${av}" class="friend-avatar">` : `<div class="friend-avatar-placeholder">${req.fromNick[0].toUpperCase()}</div>`;
+        const sender = senderDocs[req.from] || { nick: req.fromNick };
+        const avHtml = buildAvatarWrap(sender, 44, { imgClass:"friend-avatar", placeholderClass:"friend-avatar-placeholder" });
         return `<div class="friend-item" style="cursor:default">
             ${avHtml}
             <div class="friend-info">
@@ -1110,8 +1222,7 @@ window.openUserProfile = async function(userId) {
     if (!modal) return;
     modal.classList.remove("hidden");
 
-    const av = localStorage.getItem("w_av_"+userId);
-    const avHtml = av ? `<img src="${av}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #476df0">` : `<div style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#476df0,#7b5ef8);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:#fff">${user.nick[0].toUpperCase()}</div>`;
+    const avHtml = buildAvatarWrap(user, 90, { imgClass:"up-avatar-img", placeholderClass:"up-avatar-placeholder" });
 
     const badges = buildBadgesHtml(user.badges||[], "normal");
     const isFriend = (ME.friends||[]).includes(userId);

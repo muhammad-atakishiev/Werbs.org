@@ -13,18 +13,18 @@
 
     <aside class="sidebar">
         <div class="sidebar-top">
-            <button class="sidebar-icon active" id="btn-chats" data-i18n-title="ttChats" title="Чаты" onclick="switchTab('chats')">💬</button>
-            <button class="sidebar-icon" id="btn-friends" data-i18n-title="ttFriends" title="Друзья" onclick="switchTab('friends')">👥</button>
-            <button class="sidebar-icon" id="btn-add" data-i18n-title="ttAddFriend" title="Добавить друга" onclick="openAddFriend()">👤+</button>
+            <button class="sidebar-icon active" id="btn-chats" data-i18n-title="ttChats" title="Чаты" onclick="switchTab('chats')"><img src="./image/fgfgfgf.png" width="24" height="24" class="" alt=""></button>
+            <button class="sidebar-icon" id="btn-friends" data-i18n-title="ttFriends" title="Друзья" onclick="switchTab('friends')"><img src="./image/880594.png" width="24" height="24" class="" alt=""></button>
+            <button class="sidebar-icon" id="btn-add" data-i18n-title="ttAddFriend" title="Добавить друга" onclick="openAddFriend()"><img src="./image/6386837.png" width="24" height="24" class="" alt=""></button>
             <button class="sidebar-icon" id="btn-requests" onclick="openRequests()" title="Заявки в друзья" style="display:none;position:relative">
                 🔔<span class="req-badge">0</span>
             </button>
-            <button class="sidebar-icon" id="btn-shop" data-i18n-title="ttShop" title="Магазин" onclick="openShop()">🛍️</button>
+            <button class="sidebar-icon" id="btn-shop" data-i18n-title="ttShop" title="Магазин" onclick="openShop()"><img src="./image/34568.png" width="24" height="24" class="" alt=""></button>
         </div>
         <div class="sidebar-bottom">
             <button class="sidebar-icon sidebar-avatar-btn" data-i18n-title="ttProfile" title="Профиль" onclick="openProfile()" id="sidebarProfileBtn">
                 <img id="sidebarAvatarImg" src="" alt="" style="display:none;width:36px;height:36px;border-radius:50%;object-fit:cover;">
-                <span id="sidebarAvatarEmoji">🧑</span>
+                <span id="sidebarAvatarEmoji"><img src="./image/1946429.png" width="24" height="24" class="" alt=""></span>
             </button>
         </div>
     </aside>
@@ -55,7 +55,8 @@
         <div class="profile-banner" id="profileBanner"></div>
         <div class="avatar-section">
             <div class="avatar-frame-wrap" id="avatarFrameWrap">
-                <img id="avatarImg" src="" alt="avatar" onerror="this.src='https://via.placeholder.com/100x100/476df0/ffffff?text=👤'">
+                <img id="avatarImg" src="" alt="avatar" style="display:none">
+                <div id="avatarPlaceholder" class="up-avatar-placeholder" style="display:none;font-size:32px"></div>
             </div>
             <label for="avatarInput" class="avatar-change-btn" data-i18n="changePhoto">Сменить фото</label>
             <input type="file" id="avatarInput" accept="image/*" style="display:none">
@@ -73,13 +74,13 @@
             <button class="copy-btn" onclick="copyId()">📋</button>
         </div>
         <div class="time-box">
-            <div class="time-icon">⏱️</div>
+            <div class="time-icon">⏱<img src="./image/images.png" width="24" height="24" class="" alt=""></div>
             <div>
                 <small data-i18n="timeOnSiteLabel">Время на сайте</small>
                 <div id="profileTimeValue" class="time-value">0 ч</div>
             </div>
         </div>
-        <button class="decorations-btn" onclick="openInventory()">🎒 <span data-i18n="myDecorations">Мои украшения</span></button>
+        <button class="decorations-btn" onclick="openInventory()"> <span data-i18n="myDecorations">Мои украшения</span></button>
         <button class="logout-btn" onclick="logout()"> <span data-i18n="ttLogout">Выйти</span></button>
     </div>
 </div>
