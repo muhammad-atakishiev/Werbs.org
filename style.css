@@ -63,7 +63,7 @@ a:visited { color: #fff; }
     display: none;
     position: absolute;
     right: 0;
-    background: #202c33;
+    background: #2e556b;
     padding: 10px 20px;
     border-radius: 10px;
     color: white;
@@ -526,6 +526,9 @@ a:visited { color: #fff; }
     color: #000;
     max-height: 90vh;
     overflow-y: auto;
+}
+#profileModalBox {
+    height: auto; /* чтобы не появлялся скроллбар и баннер вставал ровно по краям */
 }
 .close-btn {
     position: absolute;
@@ -1319,13 +1322,34 @@ body.auth-page {
    МОБИЛЬНАЯ ВЕРСИЯ — телефоны
 ══════════════════════════════════════ */
 @media (max-width: 480px) {
-    .app-shell { grid-template-columns: 48px 1fr; }
-    .sidebar-icon { width: 38px; height: 38px; font-size: 17px; }
+    .app-shell { grid-template-columns: 44px 1fr; }
+    .sidebar { padding: 12px 0; }
+    .sidebar-top, .sidebar-bottom { gap: 4px; }
+    .sidebar-icon { width: 34px; height: 34px; font-size: 15px; border-radius: 10px; }
+
+    .chat-panel-header { padding: 12px 10px 8px; gap: 6px; }
+    .chat-panel-header h1 { font-size: 1rem; }
+    .search-wrap input { padding: 8px 10px; font-size: 13px; }
+
+    .user-list { padding: 4px 4px 6px; }
+    .friend-item { padding: 7px 7px; gap: 8px; }
+    .friend-avatar, .friend-avatar-placeholder { width: 38px; height: 38px; }
+    .friend-avatar-placeholder { font-size: 15px; }
     .friend-nick { font-size: 13px; }
     .friend-sub  { font-size: 11px; }
+
+    .chat-header { padding: 10px 12px; gap: 8px; }
+    .chat-header-avatar, .chat-header-avatar-placeholder { width: 34px; height: 34px; }
+    .chat-header-avatar-placeholder { font-size: 14px; }
+    .chat-header-nick { font-size: 13px; }
+    .chat-header-sub  { font-size: 11px; }
+
+    .chat-messages { padding: 10px 12px; gap: 4px; }
+    .chat-input-row { padding: 8px 10px; }
     .chat-input-row input[type="text"] { font-size: 13px; }
-    .msg-bubble { max-width: 88%; font-size: 13px; }
-    .chat-panel-header h1 { font-size: 1.1rem; }
+    .msg-bubble { max-width: 88%; font-size: 13px; padding: 8px 11px; }
+    .date-separator span { font-size: 11px; padding: 4px 11px; }
+
     .modal-box { width: 96vw; padding: 20px 16px; }
     .confirm-box { padding: 24px 16px; }
     .up-banner { height: 70px; }
